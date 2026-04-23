@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台61 / 台15 里程查詢</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+  h1 { font-size: 1.5rem; color: #e2b04a; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 0.85rem; margin-bottom: 30px; }
+  .card { background: #16213e; border: 1px solid #2a3a5a; border-radius: 12px; padding: 28px; width: 100%; max-width: 520px; }
+  .input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  input, select { flex: 1; padding: 12px 14px; border: 1px solid #2a3a5a; border-radius: 8px; background: #0f3460; color: #eee; font-size: 1rem; outline: none; }
+  input:focus, select:focus { border-color: #e2b04a; }
+  button { padding: 12px 20px; background: #e2b04a; color: #1a1a2e; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+  button:hover { background: #f0c560; }
+  .result { margin-top: 20px; }
+  .result-item { background: #0f3460; border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; border-left: 3px solid #e2b04a; }
+  .result-item .road { font-size: 1.1rem; font-weight: bold; color: #e2b04a; }
+  .result-item .meta { color: #888; font-size: 0.85rem; margin-top: 4px; }
+  .result-item .coords { color: #aac4e0; font-size: 0.9rem; margin-top: 6px; font-family: monospace; }
+  .no-result { color: #888; text-align: center; padding: 20px; }
+  .legend { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .legend span { font-size: 0.8rem; color: #888; }
+  .legend .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-right: 4px; }
+  .tag-61 { background: #e2b04a; color: #1a1a2e; }
+  .tag-15 { background: #4a9fe2; color: #fff; }
+  .toggle-group { display: flex; gap: 8px; margin-bottom: 20px; }
+  .toggle-btn { padding: 8px 18px; border: 1px solid #2a3a5a; border-radius: 8px; background: #0f3460; color: #888; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+  .toggle-btn:hover { border-color: #e2b04a; color: #eee; }
+  .toggle-btn.active-61 { background: #e2b04a; color: #1a1a2e; border-color: #e2b04a; font-weight: bold; }
+  .toggle-btn.active-15 { background: #4a9fe2; color: #fff; border-color: #4a9fe2; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>台61 / 台15 里程查詢</h1>
+<p class="subtitle">輸入里程樁號，查詢附近座標與村里資訊</p>
+
+  <div class="card">
+  <div class="legend">
+    <span><span class="tag tag-61">台61</span>西部濱海快速公路</span>
+    <span><span class="tag tag-15">台15</span>北部濱海公路</span>
+  </div>
+  <div class="toggle-group">
+    <button class="toggle-btn active-61" id="btn61" onclick="setFilter('台61')">台61</button>
+    <button class="toggle-btn" id="btn15" onclick="setFilter('台15')">台15</button>
+  </div>
+  <div class="input-row">
+    <input type="number" id="kmInput" placeholder="輸入公里數，如 10" />
+    <button onclick="doQuery()">查詢</button>
+  </div>
+
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+const rawData = `公路編號,坐標-E-WGS84,坐標-N-WGS84,起點樁號,隸屬鄉鎮,隸屬村里,隸屬
+台15,121.3646106,25.1348867,13K+499,林口區,太平里,林口
+台15,121.3645097,25.1351697,13K+502,林口區,太平里,林口
+台15,121.3599078,25.1335107,14K+000,林口區,太平里,林口
+台15,121.3599657,25.13321172,14K+008,林口區,太平里,林口
+台15,121.3555499,25.13134067,14K+499,林口區,太平里,林口
+台15,121.3553172,25.13156967,14K+510,林口區,太平里,林口
+台15,121.3510411,25.12943437,14K+999,林口區,太平里,林口
+台15,121.3509034,25.12972858,15K+001,林口區,太平里,林口
+台15,121.3465746,25.12769769,15K+493,林口區,太平里,林口
+台15,121.3463076,25.12798182,15K+501,林口區,太平里,林口
+台15,121.3419908,25.12577342,15K+999,林口區,瑞平里,林口
+台15,121.3418537,25.1261238,16K+000,林口區,瑞平里,林口
+台15,121.3372645,25.12436083,16K+501,林口區,瑞平里,林口
+台15,121.3328731,25.12232553,16K+999,林口區,嘉寶里,文化
+台15,121.3327838,25.12269149,17K+000,林口區,嘉寶里,文化
+台15,121.3280089,25.12149425,17K+498,林口區,嘉寶里,文化
+台15,121.3279149,25.12184489,17K+500,林口區,嘉寶里,文化
+台15,121.3230295,25.12116157,17K+999,林口區,嘉寶里,文化
+台15,121.3229901,25.12151903,18K+001,林口區,嘉寶里,文化
+台15,121.3180599,25.12107331,18K+498,林口區,嘉寶里,文化
+台15,121.3180604,25.12145372,18K+500,林口區,嘉寶里,文化
+台15,121.3131068,25.12150077,18K+999,林口區,嘉寶里,文化
+台15,121.3131259,25.12185513,19K+001,林口區,嘉寶里,文化
+台15,121.3082221,25.12148119,19K+498,林口區,下福里,文化
+台15,121.3081407,25.12188615,19K+501,林口區,下福里,文化
+台15,121.3034086,25.12255796,20K+000,林口區,下福里,文化
+台15,121.3036024,25.12294559,20K+000,林口區,下福里,文化
+台15,121.298749,25.12274584,20K+511,林口區,下福里,文化
+台15,121.2987214,25.12270411,20K+516,林口區,下福里,文化
+台15,121.2952438,25.11973087,20K+999,林口區,下福里,文化
+台15,121.2950098,25.11998618,21K+001,林口區,下福里,文化
+台15,121.2907406,25.11779906,21K+501,林口區,下福里,文化
+台15,121.2908913,25.1174388,21K+501,林口區,下福里,文化
+台61,121.3660698,25.1353596,7K+721,林口區,太平里,林口
+台61,121.3651027,25.1351927,7K+821,林口區,太平里,林口
+台61,121.3641264,25.1349834,7K+923,林口區,太平里,林口
+台61,121.3631936,25.1347038,8K+022,林口區,太平里,林口
+台61,121.3622716,25.1343479,8K+122,林口區,太平里,林口
+台61,121.3613861,25.1339735,8K+222,林口區,太平里,林口
+台61,121.360471,25.1335865,8K+324,林口區,太平里,林口
+台61,121.3595599,25.1332015,8K+425,林口區,太平里,林口
+台61,121.3586734,25.132826,8K+523,林口區,太平里,林口
+台61,121.3577876,25.1324519,8K+621,林口區,太平里,林口
+台61,121.3568814,25.1320681,8K+720,林口區,太平里,林口
+台61,121.3559832,25.1316882,8K+819,林口區,太平里,林口
+台61,121.3550855,25.1313096,8K+919,林口區,太平里,林口
+台61,121.3541877,25.1309283,9K+020,林口區,太平里,林口
+台61,121.3532916,25.1305496,9K+120,林口區,太平里,林口
+台61,121.3524055,25.1301749,9K+219,林口區,太平里,林口
+台61,121.3514851,25.1297879,9K+321,林口區,太平里,林口
+台61,121.3505547,25.1294231,9K+423,林口區,太平里,林口
+台61,121.3496529,25.1291057,9K+521,林口區,太平里,林口
+台61,121.3487086,25.128793,9K+622,林口區,太平里,林口
+台61,121.3477886,25.1284628,9K+721,林口區,太平里,林口
+台61,121.3469045,25.1280689,9K+820,林口區,太平里,林口
+台61,121.3460319,25.1276141,9K+923,林口區,太平里,林口
+台61,121.3451899,25.1271731,10K+021,林口區,太平里,林口
+台61,121.3443052,25.1267583,10K+121,林口區,瑞平里,林口
+台61,121.3433908,25.126397,10K+223,林口區,瑞平里,林口
+台61,121.3424567,25.1260937,10K+322,林口區,瑞平里,林口
+台61,121.3415079,25.1258375,10K+423,林口區,瑞平里,林口
+台61,121.3405496,25.1255849,10K+523,林口區,瑞平里,林口
+台61,121.3396172,25.1252875,10K+623,林口區,瑞平里,林口
+台61,121.3387218,25.1249178,10K+722,林口區,瑞平里,林口
+台61,121.3378567,25.1244751,10K+823,林口區,瑞平里,林口
+台61,121.337007,25.1239957,10K+924,林口區,瑞平里,林口
+台61,121.336151,25.123543,11K+023,林口區,瑞平里,林口
+台61,121.3352598,25.1231561,11K+123,林口區,瑞平里,林口
+台61,121.3343255,25.1228412,11K+224,林口區,瑞平里,林口
+台61,121.3333551,25.122605,11K+327,林口區,瑞平里,林口
+台61,121.3323766,25.1224244,11K+426,林口區,瑞平里,林口
+台61,121.3314229,25.1222389,11K+524,林口區,嘉寶里,文化
+台61,121.3304263,25.1220833,11K+626,林口區,嘉寶里,文化
+台61,121.329452,25.1219131,11K+726,林口區,嘉寶里,文化
+台61,121.3284901,25.1217485,11K+825,林口區,嘉寶里,文化
+台61,121.3275151,25.1216072,11K+924,林口區,嘉寶里,文化
+台61,121.3265095,25.1215085,12K+026,林口區,嘉寶里,文化
+台61,121.3257279,25.121439,12K+106,林口區,嘉寶里,文化
+台61,121.3246788,25.1213883,12K+211,林口區,嘉寶里,文化
+台61,121.3236844,25.1213386,12K+311,林口區,嘉寶里,文化
+台61,121.322579,25.1212265,12K+422,林口區,嘉寶里,文化
+台61,121.3215634,25.12127,12K+525,林口區,嘉寶里,文化
+台61,121.3205506,25.1211998,12K+628,林口區,嘉寶里,文化
+台61,121.3195706,25.121198,12K+727,林口區,嘉寶里,文化
+台61,121.3185721,25.1212226,12K+827,林口區,嘉寶里,文化
+台61,121.3176152,25.1212954,12K+923,林口區,嘉寶里,文化
+台61,121.3166289,25.1213777,13K+024,林口區,下福里,文化
+台61,121.3154031,25.1214755,13K+149,林口區,下福里,文化
+台61,121.3146232,25.1215441,13K+228,林口區,下福里,文化
+台61,121.3134987,25.12163,13K+341,林口區,下福里,文化
+台61,121.3127534,25.1217037,13K+416,林口區,下福里,文化
+台61,121.3115638,25.1217942,13K+536,林口區,下福里,文化
+台61,121.3106368,25.1218334,13K+631,林口區,下福里,文化
+台61,121.309352,25.1217954,13K+760,林口區,下福里,文化
+台61,121.3085839,25.1217314,13K+839,林口區,下福里,文化
+台61,121.3075573,25.1216002,13K+945,林口區,下福里,文化
+台61,121.306816,25.121585,14K+020,林口區,下福里,文化
+台61,121.3059302,25.1217229,14K+111,林口區,下福里,文化
+台61,121.3049281,25.122126,14K+222,林口區,下福里,文化
+台61,121.3039732,25.1225677,14K+330,林口區,下福里,文化
+台61,121.303134,25.1229614,14K+425,林口區,下福里,文化
+台61,121.3022194,25.1233023,14K+526,林口區,下福里,文化
+台61,121.3012467,25.1234377,14K+627,林口區,下福里,文化
+台61,121.300265,25.1233448,14K+727,林口區,下福里,文化
+台61,121.2993259,25.1230267,14K+829,林口區,下福里,文化
+台61,121.2985236,25.122615,14K+921,林口區,下福里,文化
+台61,121.2976673,25.1221333,15K+022,林口區,下福里,文化
+台61,121.2968764,25.1215717,15K+124,林口區,下福里,文化
+台61,121.2962307,25.1209427,15K+220,林口區,下福里,文化
+台61,121.2955229,25.1202105,15K+327,林口區,下福里,文化
+台61,121.2948044,25.119638,15K+423,林口區,下福里,文化
+台61,121.2940296,25.1192081,15K+514,林口區,下福里,文化
+台61,121.2932299,25.1187919,15K+607,林口區,下福里,文化
+台61,121.2923629,25.118343,15K+707,林口區,下福里,文化
+台61,121.291623,25.1179556,15K+793,林口區,下福里,文化
+台61,121.2907408,25.1176056,15K+891,林口區,下福里,文化
+台61,121.289727,25.1174274,15K+996,林口區,下福里,文化
+台61,121.2887661,25.117343,16K+093,林口區,下福里,文化
+台61,121.2877998,25.1171347,16K+192,林口區,下福里,文化
+台61,121.2867846,25.116847,16K+301,林口區,下福里,文化
+台61,121.2858093,25.1166991,16K+401,林口區,下福里,文化
+台61,121.2847994,25.1167289,16K+503,林口區,下福里,文化
+台61,121.2840176,25.1167956,16K+582,林口區,下福里,文化`;
+
+// 解析 CSV
+const rows = rawData.trim().split('\n').slice(1).map(line => {
+  const parts = line.split(',');
+  return {
+    road: parts[0],
+    lon: parseFloat(parts[1]),
+    lat: parseFloat(parts[2]),
+    stake: parts[3],
+    township: parts[4],
+    village: parts[5],
+    district: parts[6]
+  };
+});
+
+// 解析樁號為公里數
+function parseStake(s) {
+  const m = s.match(/(\d+)K\+(\d+)/);
+  if (m) return parseInt(m[1]) + parseInt(m[2]) / 1000;
+  return null;
+}
+
+// 格式化公里數為樁號
+function formatStake(km) {
+  const k = Math.floor(km);
+  const m = Math.round((km - k) * 1000);
+  return `${k}K+${String(m).padStart(3, '0')}`;
+}
+
+rows.forEach(r => {
+  r.km = parseStake(r.stake);
+});
+
+let currentFilter = '台61';
+
+function setFilter(f) {
+  currentFilter = f;
+  document.getElementById('btn61').className = 'toggle-btn' + (f === '台61' ? ' active-61' : '');
+  document.getElementById('btn15').className = 'toggle-btn' + (f === '台15' ? ' active-15' : '');
+  doQuery();
+}
+function doQuery() {
+  const input = document.getElementById('kmInput').value.trim();
+  const resultDiv = document.getElementById('result');
+
+  const queryKm = parseInt(input);
+
+  if (isNaN(queryKm) || queryKm < 0) {
+    resultDiv.innerHTML = '<div class="no-result">請輸入公里數，例如 10</div>';
+    return;
+  }
+
+  // 篩選該 K 數的全部資料（km >= queryKm 且 km < queryKm + 1）
+  let candidates = rows.filter(r => r.km !== null && r.km >= queryKm && r.km < queryKm + 1 && r.road === currentFilter);
+
+  if (candidates.length === 0) {
+    resultDiv.innerHTML = `<div class="no-result">查無 ${queryKm}K 資料，里程範圍：台61 7K~16K、台15 13K~21K</div>`;
+    return;
+  }
+
+  resultDiv.innerHTML = candidates.map(r => {
+    const tagClass = r.road === '台61' ? 'tag-61' : 'tag-15';
+    const gmapsUrl = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
+    return `<div class="result-item">
+      <div class="road"><span class="tag ${tagClass}">${r.road}</span> ${r.stake}</div>
+      <div class="coords"><a href="${gmapsUrl}" target="_blank" style="color:#4fc3f7;text-decoration:underline;">📍 ${r.lat}, ${r.lon}</a>（點擊開啟 Google Maps）</div>
+      <div class="meta">${r.township} ${r.village}（${r.district}）</div>
+    </div>`;
+  }).join('');
+}
+
+// Enter key
+document.getElementById('kmInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doQuery();
+});
+</script>
+</body>
+</html>
